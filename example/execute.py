@@ -2,16 +2,21 @@ from example import util
 import json
 import os
 import sys
+from absl import flags, app
+
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string(name="file_path", default="", help="file path which is contained ids")
 
 
-def run():
+def main(argv):
     cached_url = "url.json"
     if os.path.isfile(cached_url):
         with open(cached_url, "r") as f:
             text = f.read()
             urls = json.loads(text)
     else:
-        ids_file = "Ind-test-From-KEGG-to-DrugBank-to-UniProt.txt"
+        ids_file = FLAGS.file_path
 
         ids = []
         with open(ids_file, "r") as f:
@@ -54,9 +59,4 @@ class Virtual:
 
 
 if __name__ == "__main__":
-    run()
-    # with open("result.json", "r") as f:
-    #     result = json.loads(f.read())
-    #
-    # for key, value in result.items():
-    #     print(key, value)
+    app.run(main)
