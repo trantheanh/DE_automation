@@ -1,4 +1,4 @@
-import util
+from example import util
 import json
 import os
 import sys
