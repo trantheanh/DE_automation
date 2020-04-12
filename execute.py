@@ -44,4 +44,9 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    # run()
+    with open("result.json", "r") as f:
+        result = json.loads(f.read())
+
+    for key, value in result.items():
+        print(key, value)

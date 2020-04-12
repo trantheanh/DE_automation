@@ -1,14 +1,22 @@
 import os
 import sys
-import platform
 import json
+
+from driver import DRIVER_DIR
+
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.keys import Keys
-import selenium.common.exceptions as exceptions
 from selenium.webdriver.common.action_chains import ActionChains
+
+from PIL import Image
+
+
+class Browser:
+    Chrome = "Chrome"
+    Firefox = "Firefox"
 
 
 def catch_exception(func):
@@ -21,12 +29,25 @@ def catch_exception(func):
     return get_func
 
 
-def get_driver(file_name):
-    driver_path = os.path.dirname(os.path.abspath(__file__)) + '/' + file_name
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument("--kiosk")
+def get_driver(browser_name=None):
+    if "darwin" in sys.platform:
+        extention = ""
+    elif "win" in sys.platform:
+        extention = ".exe"
+    else:
+        extention = ""
 
-    driver = webdriver.Chrome(driver_path, chrome_options=chrome_options)
+    if browser_name == Browser.Chrome:
+        driver_path = os.path.join(DRIVER_DIR, "Chrome/chromedriver{}".format(extention))
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument("--kiosk")
+        driver = webdriver.Chrome(driver_path, chrome_options=chrome_options)
+    elif browser_name == Browser.Firefox:
+        driver_path = ""
+        driver = None
+    else:
+        driver_path = ""
+        driver = None
 
     return driver
 
@@ -38,6 +59,23 @@ class Template:
         self.timeout = timeout
         self.current_focus = None
         self.current_sub_focus = None
+
+    # @catch_exception
+    def capture_current_focus(self, file_path):
+        location = self.current_focus.location
+        size = self.current_focus.size
+        self.driver.save_screenshot("screen_shot.png")
+
+        x = location['x']
+        y = location['y']
+        width = location['x'] + size['width']
+        height = location['y'] + size['height']
+
+        im = Image.open("../screen_shot.png")
+        im = im.crop((int(x), int(y), int(width), int(height)))
+        im.save(file_path)
+
+        return location, size
 
     @catch_exception
     def goto_url(self, url):
