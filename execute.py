@@ -43,10 +43,20 @@ def run():
     pass
 
 
-if __name__ == "__main__":
-    # run()
-    with open("result.json", "r") as f:
-        result = json.loads(f.read())
+class Virtual:
+    def __init__(self):
+        self.current_focus = "HIHI_HAHA"
+        return
 
-    for key, value in result.items():
-        print(key, value)
+    def execute(self, func):
+        func(current_focus=self.current_focus)
+        return
+
+
+if __name__ == "__main__":
+    run()
+    # with open("result.json", "r") as f:
+    #     result = json.loads(f.read())
+    #
+    # for key, value in result.items():
+    #     print(key, value)

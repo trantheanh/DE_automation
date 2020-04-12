@@ -1,32 +1,14 @@
 import os
 import sys
+
+
 import json
 
 from driver import DRIVER_DIR
+from automator.category import Browser
+import automator.action as action
 
 from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as ec
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-
-from PIL import Image
-
-
-class Browser:
-    Chrome = "Chrome"
-    Firefox = "Firefox"
-
-
-def catch_exception(func):
-    def get_func(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except:
-            return False
-
-    return get_func
 
 
 def get_driver(browser_name=None):
@@ -41,241 +23,157 @@ def get_driver(browser_name=None):
         driver_path = os.path.join(DRIVER_DIR, "Chrome/chromedriver{}".format(extention))
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--kiosk")
-        driver = webdriver.Chrome(driver_path, chrome_options=chrome_options)
+        driver = webdriver.Chrome(driver_path, options=chrome_options)
     elif browser_name == Browser.Firefox:
-        driver_path = ""
         driver = None
     else:
-        driver_path = ""
         driver = None
 
     return driver
 
 
-class Template:
+class Tester:
+    def __init__(
+            self,
+            browser=Browser.Chrome,
+            driver=None,
+            timeout=120
+    ):
+        if driver is None:
+            driver = get_driver(browser_name=browser)
 
-    def __init__(self, driver, timeout=120):
         self.driver = driver
         self.timeout = timeout
-        self.current_focus = None
-        self.current_sub_focus = None
+        self.current_focus = self.driver
+        self.cached = []
+        self.test_cases = None
 
-    # @catch_exception
-    def capture_current_focus(self, file_path):
-        location = self.current_focus.location
-        size = self.current_focus.size
-        self.driver.save_screenshot("screen_shot.png")
+    def reset_state(self):
+        self.current_focus = self.driver
+        self.cached = []
 
-        x = location['x']
-        y = location['y']
-        width = location['x'] + size['width']
-        height = location['y'] + size['height']
+    def previous_focus(self, need_remove=True):
+        if len(self.cached) > 0:
+            self.current_focus = self.cached[-1]
 
-        im = Image.open("../screen_shot.png")
-        im = im.crop((int(x), int(y), int(width), int(height)))
-        im.save(file_path)
+        if need_remove:
+            del self.cached[-1]
 
-        return location, size
+    def caching(self):
+        self.cached.append(self.current_focus)
 
-    @catch_exception
-    def goto_url(self, url):
-        self.driver.get(url=url)
+    def execute(self, func, **kwargs):
+        output = func(
+            driver=self.driver,
+            current_focus=self.current_focus,
+            timeout=self.timeout,
+            **kwargs
+        )
+        # print("Executing: {}".format(func.__name__))
 
-        return True
+        if output:
+            self.current_focus = output
 
-    @catch_exception
-    def enter_input(self,
-                    input_xpath='//html',
-                    value=Keys.RETURN):
-        element = self.driver.find_element_by_xpath(input_xpath)
-        element.clear()
-        element.send_keys(value)
+            return True
 
-        return True
+        return False
 
-    @catch_exception
-    def press_button(self,
-                     btn_xpath='//html'):
-        btn_login = self.driver.find_element_by_xpath(btn_xpath)
-        btn_login.send_keys(Keys.RETURN)
+    def get(self, func, **kwargs):
+        output = func(
+            driver=self.driver,
+            current_focus=self.current_focus,
+            timeout=self.timeout,
+            **kwargs
+        )
 
-        return True
+        return output
 
-    @catch_exception
-    def press_button_by_index(self, target_index=0):
-        elements = self.current_focus.find_elements_by_xpath('*')
-        print('# elements: {}'.format(len(elements)))
-
-        elements[target_index].click()
-        return True
-
-    @catch_exception
-    def wait_util(self, target_xpath='//html', need_to_close=False):
-        try:
-            WebDriverWait(self.driver, self.timeout).until(
-                ec.presence_of_element_located((By.XPATH, target_xpath))
-            )
-        except:
-            print('CANT LOCATE {}...Close the browser'.format(target_xpath))
-            if need_to_close:
-                self.driver.close()
-            return False
-
-        return True
-
-    @catch_exception
-    def drag_and_drop(self, source_element, target_element):
-        ActionChains(self.driver).drag_and_drop(source=source_element,
-                                                target=target_element).perform()
-        return True
-
-    @catch_exception
-    def scroll_to(self, target_element):
-        ActionChains(self.driver).move_to_element(target_element).perform()
-        return True
-
-    @catch_exception
-    def drag_and_drop_by_xpath(self, source_xpath='//html', target_xpath='//html'):
-        source_element = self.driver.find_element_by_xpath(source_xpath)
-        target_element = self.driver.find_element_by_xpath(target_xpath)
-
-        self.drag_and_drop(source_element=source_element,
-                           target_element=target_element)
-        return True
-
-    @catch_exception
-    def drag_and_drop_by_index(self, source_index=1, target_index=2):
-        elements = self.current_focus.find_elements_by_xpath('*')
-
-        self.drag_and_drop(source_element=elements[source_index],
-                           target_element=elements[target_index])
-
-        return True
-
-    @catch_exception
-    def focus(self, target_xpath='//html'):
-        element = self.driver.find_element_by_xpath(target_xpath)
-        self.current_focus = element
-
-        return True
-
-    @catch_exception
-    def focus_to_child(self, target_xpath='//html'):
-        element = self.current_focus.find_element_by_xpath(target_xpath)
-        self.current_focus = element
-
-    @catch_exception
-    def subfocus_to_child(self, target_xpath='//html'):
-        element = self.current_sub_focus.find_element_by_xpath(target_xpath)
-        self.current_sub_focus = element
-
-    @catch_exception
-    def focus_by_index(self, target_index=0, need_log=False):
-        elements = self.current_focus.find_elements_by_xpath('*')
-        if need_log:
-            print('# target_index/elements: {}/{}'.format(target_index, len(elements)))
-
-        if target_index >= len(elements):
-            return False
-
-        self.current_sub_focus = elements[target_index]
-        return True
-
-    @catch_exception
-    def get_text_from_current_sub_focus(self, target_xpath='//html'):
-        element = self.current_sub_focus.find_element_by_xpath(target_xpath)
-        return element.text
-
-    @catch_exception
-    def get_texts_from_current_sub_focus(self, target_xpath='//html'):
-        elements = self.current_sub_focus.find_elements_by_xpath(target_xpath)
-        return [element.text for element in elements]
-
-    @catch_exception
-    def get_text_from_current_focus(self, target_xpath='//html'):
-        element = self.current_focus.find_element_by_xpath(target_xpath)
-        return element.text
-
-    @classmethod
-    def get_xpath(cls, tag_name='html', att_dict={}):
-        xpath = "//{}".format(tag_name)
-        for att, value in att_dict.items():
-            xpath = xpath + "[@{}='{}']".format(att, value)
-
-        return xpath
-
-    @classmethod
-    def get_xpath_sub(cls, tag_name='html', att_dict={}):
-        xpath = ".//{}".format(tag_name)
-        for att, value in att_dict.items():
-            xpath = xpath + "[@{}='{}']".format(att, value)
-
-        return xpath
-
-
-class Utility:
-    def __init__(self):
-        return
-
-    @classmethod
-    def read_config(cls, file_name=''):
-        file_path = os.path.dirname(os.path.abspath(__file__)) + '/' + file_name
-
+    def read_testcase(self, file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             json_string = f.read()
             test_cases = json.loads(json_string)
             test_cases = test_cases['steps']
             test_cases.sort(key=lambda x: (x['index']))
 
-            return test_cases
+            self.test_cases = test_cases
 
-    @classmethod
-    def read_testcase(cls, test_case={}, template=None):
-        print("Processing: {} - {}".format(test_case['index'], test_case['name']))
-        case_type = test_case['type']
-        case_content = test_case['content']
+        return
+
+    def execute_testcase(self):
+        if not self.test_cases:
+            raise Exception("YOU NEED TO PROVIDE TEST CASE")
+
+        for i in range(len(self.test_cases)):
+            self.execute_step(step=self.test_cases[i])
+
+        return
+
+    def execute_step(self, step):
+        print("Processing: {} - {}".format(step['index'], step['name']))
+        case_type = step['type']
+        case_content = step['content']
+
         if case_type == 'url':
-            template.goto_url(
+            action.goto_url(
+                driver=self.driver,
                 url=case_content['url']
             )
         elif case_type == 'input':
-            template.enter_input(
-                input_xpath=Template.get_xpath(
+            action.enter_input(
+                parent=self.current_focus,
+                input_xpath=Tester.get_xpath(
                     tag_name=case_content['tag_name'],
-                    att_dict=case_content['att_dict']),
+                    att_dict=case_content['att_dict']
+                ),
                 value=case_content['value']
             )
         elif case_type == 'wait':
-            template.wait_util(
-                target_xpath=Template.get_xpath(
+            action.wait_for(
+                driver=self.driver,
+                target_xpath=Tester.get_xpath(
                     tag_name=case_content['tag_name'],
                     att_dict=case_content['att_dict']
                 )
             )
         elif case_type == 'click':
-            template.press_button(
-                btn_xpath=Template.get_xpath(
+            action.click(
+                parent=self.current_focus,
+                target_xpath=Tester.get_xpath(
                     tag_name=case_content['tag_name'],
                     att_dict=case_content['att_dict']
                 )
             )
         elif case_type == 'focus':
-            template.focus(
-                target_xpath=Template.get_xpath(
+            action.focus(
+                parent=self.current_focus,
+                target_xpath=Tester.get_xpath(
                     tag_name=case_content['tag_name'],
                     att_dict=case_content['att_dict']
                 )
             )
         elif case_type == 'drag_drop_by_index':
-            template.drag_and_drop_by_index(
+            action.drag_and_drop_by_index(
+                parent=self.current_focus,
                 source_index=case_content['source_index'],
                 target_index=case_content['target_index']
             )
         elif case_type == 'click_by_index':
-            template.press_button_by_index(
+            action.click_at_index(
+                parent=self.current_focus,
                 target_index=case_content['target_index']
             )
 
+    @classmethod
+    def get_xpath(cls, tag_name='html', att_dict=None, is_parent=True):
+        if att_dict is None:
+            att_dict = {}
 
+        xpath = "//{}".format(tag_name)
 
+        for att, value in att_dict.items():
+            xpath = xpath + "[@{}='{}']".format(att, value)
 
+        if is_parent:
+            xpath = ".{}".format(xpath)
+
+        return xpath
